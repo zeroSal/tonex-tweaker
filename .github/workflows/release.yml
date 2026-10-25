@@ -59,11 +59,25 @@ jobs:
           PROPS
 
       - run: flutter pub get
-      - run: flutter build apk --release
-      - run: mv build/app/outputs/flutter-apk/app-release.apk "tonex-tweaker-$GITHUB_REF_NAME.apk"
+      # One APK per ABI: the universal APK carries three copies of the Flutter engine.
+      - run: >-
+          flutter build apk --release --split-per-abi
+          --target-platform android-arm,android-arm64
+          --obfuscate --split-debug-info=build/symbols
+      - run: |
+          out=build/app/outputs/flutter-apk
+          mv $out/app-arm64-v8a-release.apk "tonex-tweaker-$GITHUB_REF_NAME-arm64.apk"
+          mv $out/app-armeabi-v7a-release.apk "tonex-tweaker-$GITHUB_REF_NAME-armv7.apk"
+
+      # Needed to symbolize obfuscated stack traces (flutter symbolize).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debug-symbols-${{ github.ref_name }}
+          path: build/symbols
+          retention-days: 90
 
       - uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          files: tonex-tweaker-${{ github.ref_name }}.apk
+          files: tonex-tweaker-${{ github.ref_name }}-*.apk
           generate_release_notes: true
